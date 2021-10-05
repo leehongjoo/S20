@@ -1,4 +1,4 @@
-# S20
+# S20 python ble graph program
 s20 development_vert6_test inspection.py
 
 author : hong joo Lee
