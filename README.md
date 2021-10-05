@@ -12,3 +12,8 @@ table edit not have
 
 
 detail description -> 홍주's notion. ^^
+
+
+
+----------- measuring picture
+![image](https://user-images.githubusercontent.com/7110830/135975203-aebeca8e-a03c-4329-85ed-6fa63299c0a1.png)
