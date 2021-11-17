@@ -963,9 +963,9 @@ class MainWindow(QMainWindow):
             ch2_int = tc.twos_comp(ch2_int, 24)
             ch2_int = ch2_int * self.max_uv / 1000 * 1.31
             self.ch2_int_buffer.append(ch2_int)
-            # self.dataIndex += 1
-            # data = xml_write.makeXML(self.dataIndex, ch1_int, ch2_int)
-            # self.user.append(data)
+            self.dataIndex += 1
+            data = xml_write.makeXML(self.dataIndex, ch1_int, ch2_int)
+            self.user.append(data)
 
     def print_graph(self):
         ch1 = []
