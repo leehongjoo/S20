@@ -918,8 +918,10 @@ class MainWindow(QMainWindow):
             #filtering_ch1 = bf.butter_bandpass_filter(filtering_ch1, 1, 20, self.samplingRate, 7)
             #filtering_ch2 = bf.butter_bandpass_filter(filtering_ch2, 1, 20, self.samplingRate, 7)
         else:
-            filtering_ch1 = hf.butter_highpass_filter(filtering_ch1, 4, self.samplingRate, 5)
-            filtering_ch2 = hf.butter_highpass_filter(filtering_ch2, 4, self.samplingRate, 5)
+            filtering_ch1 = lf.butter_lowpass_filter(filtering_ch1, 50, self.samplingRate)
+            filtering_ch2 = lf.butter_lowpass_filter(filtering_ch2, 50, self.samplingRate)
+            #filtering_ch1 = hf.butter_highpass_filter(filtering_ch1, 4, self.samplingRate, 5)
+            #filtering_ch2 = hf.butter_highpass_filter(filtering_ch2, 4, self.samplingRate, 5)
             #filtering_ch1 = bf.butter_bandpass_filter(filtering_ch1, 1, 50, self.samplingRate, 7)
             #filtering_ch2 = bf.butter_bandpass_filter(filtering_ch2, 1, 50, self.samplingRate, 7)
 
@@ -964,6 +966,7 @@ class MainWindow(QMainWindow):
         self.user.append(fft_node)
         self.line_fft.setData(x=self.frequencies, y=ch1_fft)
         self.line_fft_ch2.setData(x=self.frequencies, y=ch2_fft)
+
 
 eeg_bands = {'Delta': (1, 3),
              'Theta': (4, 7),

@@ -20,5 +20,5 @@ def butter_lowpass_filter(data, cutoff, fs, order=5):
     b, a = butter_lowpass(cutoff, fs, order=order)
     #y = signal.filtfilt(b, a, data)
     #zi = lfilter_zi(b, a)
-    y= lfilter(b, a, data)#, zi=zi * data[0])
+    y = lfilter(b, a, data)#, zi=zi * data[0])
     return y

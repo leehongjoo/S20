@@ -448,7 +448,7 @@ class MainWindow(QMainWindow):
         self.lowPassActionGroup.addAction(self.bandpass20)
         self.lowPassActionGroup.addAction(self.bandpass50)
         self.lowPassActionGroup.addAction(self.lowPass50)
-        self.bandpass50.setChecked(True)
+        self.lowPass50.setChecked(True)
         self.lowPassActionGroup.triggered.connect(self.setLowPass)
         '''
         # #fft channel change
@@ -697,6 +697,7 @@ class MainWindow(QMainWindow):
             self.lowPassNoneButton()
         elif action == self.lowPass50:
             self.lowPass50Button()
+            print("lowpass Action")
         elif action == self.bandpass20:
             self.bandpass20Button()
         else:
@@ -704,8 +705,8 @@ class MainWindow(QMainWindow):
 
     def lowPassNoneButton(self):
         self.lowPassSelect = lowPassFilterSelect.none
-        self.ax1.enableAutoRange(axis='y', enable=True)
-        self.ax3.enableAutoRange(axis='y', enable=True)
+        self.ax1.setRange(xRange=[-5, 0], yRange=[-100, 100])
+        self.ax3.setRange(xRange=[-5, 0], yRange=[-100, 100])
 
     def lowPass50Button(self):
         self.lowPassSelect = lowPassFilterSelect.lpf50
@@ -1019,6 +1020,7 @@ class MainWindow(QMainWindow):
         else:
             filtering_ch1 = lf.butter_lowpass_filter(filtering_ch1, 50, self.samplingRate)
             filtering_ch2 = lf.butter_lowpass_filter(filtering_ch2, 50, self.samplingRate)
+
 
         #filtering_ch1_alpha = bf.butter_bandpass_filter(filtering_ch1, 8, 13, self.samplingRate, 5)
         #filtering_ch2_alpha = bf.butter_bandpass_filter(filtering_ch2, 8, 13, self.samplingRate, 5)

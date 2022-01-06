@@ -15,6 +15,7 @@ ver6 filteredDataExtract - Save Data : raw data -> filtered data
 SEEG 용으로 inputDialog 추가
 ByteDataTxt - Byte Data String으로 txt
 hardwareValue 추가 -> mav_uv /1000 지우고
+save 여러번 가능 id는 그대로임
 """
 from PySide2.QtWidgets import (QMainWindow, QAction, QApplication, QSplashScreen, QDockWidget, QListWidget, QInputDialog,
                                QProgressBar, QLabel, QMessageBox, QWidget, QVBoxLayout, QHBoxLayout, QTextEdit,
@@ -61,8 +62,8 @@ class MainWindow(QMainWindow):
         self.yRange = [-20, 20]
         self.dequeMax = 250
         self.fftMax = 250
-        self.offset = 4.0
-        self.offsetPlus = 3.3
+        self.offset = 1.0
+        self.offsetPlus = 0    #3.3
         self.notchCutOff = 60
         self.notchQualityFactor = 30
         self.lowPassCutOff = 50
@@ -85,7 +86,7 @@ class MainWindow(QMainWindow):
         self.battery_array.append(75)
         self.battery_array.append(75)
         #TxT
-        #self.f = open("C:/Users/KimKyoungHoon/Desktop/python_txt/bytes.txt", 'w')
+        #self.f = open("C:/Users/KimKyoungHoon/Desktop/python_txt/Decimal4.txt", 'w')
 
         # value
         self.timerCounter = 0
@@ -109,7 +110,7 @@ class MainWindow(QMainWindow):
         self.screenHeight = 1000
         self.screenWidth = 1920
         self.notchSelect = notchFilterSelect.notch60
-        self.lowPassSelect = lowPassFilterSelect.lpf50
+        self.lowPassSelect = lowPassFilterSelect.bpf1_50
         self.FFT_Select = FFT_Channel_Select.ch1
 
         fft_freq = fftpack.fftfreq(self.BL, 1 / self.samplingRate)
@@ -454,12 +455,17 @@ class MainWindow(QMainWindow):
         self.lowPass50.setStatusTip("band pass Filter apply")
         self.lowPass50.setCheckable(True)
         self.lowPass50.triggered.connect(self.lowPass50Button)
+        self.high1 = QAction("S20 : 1Hz", self)
+        self.high1.setStatusTip("high pass Filter apply")
+        self.high1.setCheckable(True)
+        self.high1.triggered.connect(self.highpass1Button)
         self.lowPassActionGroup = QActionGroup(self)
         self.lowPassActionGroup.addAction(self.lowPassNone)
         self.lowPassActionGroup.addAction(self.bandpass20)
         self.lowPassActionGroup.addAction(self.bandpass50)
         self.lowPassActionGroup.addAction(self.lowPass50)
-        self.lowPass50.setChecked(True)
+        self.lowPassActionGroup.addAction(self.high1)
+        self.bandpass50.setChecked(True)
         self.lowPassActionGroup.triggered.connect(self.setLowPass)
         '''
         # #fft channel change
@@ -509,6 +515,7 @@ class MainWindow(QMainWindow):
         LowPassMenu.addAction(self.bandpass20)
         LowPassMenu.addAction(self.bandpass50)
         LowPassMenu.addAction(self.lowPass50)
+        LowPassMenu.addAction(self.high1)
         '''
         FFTChangeMenu = self.menuBar().addMenu("&3D_FFT_Ch")
         FFTChangeMenu.addAction(self.FFT_Ch1)
@@ -713,6 +720,8 @@ class MainWindow(QMainWindow):
             print("lowpass Action")
         elif action == self.bandpass20:
             self.bandpass20Button()
+        elif action == self.high1:
+            self.highpass1Button()
         else:
             self.bandpass50Button()
 
@@ -733,6 +742,11 @@ class MainWindow(QMainWindow):
 
     def bandpass20Button(self):
         self.lowPassSelect = lowPassFilterSelect.bpf1_20
+        self.ax1.setRange(xRange=[-5, 0], yRange=[-100, 100])
+        self.ax3.setRange(xRange=[-5, 0], yRange=[-100, 100])
+
+    def highpass1Button(self):
+        self.lowPassSelect = lowPassFilterSelect.high1
         self.ax1.setRange(xRange=[-5, 0], yRange=[-100, 100])
         self.ax3.setRange(xRange=[-5, 0], yRange=[-100, 100])
 
@@ -804,11 +818,12 @@ class MainWindow(QMainWindow):
     def save_xml(self):
         xml_write.indent(self.user)
         now = datetime.datetime.now()
-        nowDate = now.strftime('%Y-%m-%d.%H.%M')
+        nowDate = now.strftime('%Y-%m-%d.%H.%M.%S')
         nowXml = nowDate + '.xml'
         ET.ElementTree(self.user).write(nowXml)
         nowXml = "저장이 완료 되었습니다" + nowXml
         self.lLabel.setText(nowXml)
+        self.user.clear()
 
     def stopDialog(self):
         sd = stopdialog.Ui_dialog(self)
@@ -893,6 +908,7 @@ class MainWindow(QMainWindow):
         self.data3_x = np.linspace(0, 29999, 30000) * 0.004
         self.data4 = np.zeros(30000)
         self.data4_x = np.linspace(0, 29999, 30000) * 0.004
+
         #self.data_fft = np.zeros(50)
         #self.data_fft_x = np.linspace(0, 49, 50)
         #self.data_fft_ch2 = np.zeros(50)
@@ -965,7 +981,7 @@ class MainWindow(QMainWindow):
     def tx_data_received(self, sender, data):
         str_data = data[0]
         str_data = repr(str_data)
-        byte_var = data.hex()
+        #byte_var = data.hex()
         #self.f.write(byte_var)
         #self.f.write('\n')
         self.listWidget.addItem(str_data)
@@ -1000,7 +1016,11 @@ class MainWindow(QMainWindow):
 
             ch1_int = (ch1_1_value * self.two_16) + (ch1_2_value * self.two_8) + ch1_3_value
             ch1_int = tc.twos_comp(ch1_int, 24)
+            str_data = str(ch1_int)
+            #self.f.write(str_data)
+            #self.f.write('\n')
             ch1_int = (ch1_int * self.hardwareValue + self.offsetPlus) * self.offset
+
             self.ch1_int_buffer.append(ch1_int)
             ch2_int = (ch2_1_value * self.two_16) + (ch2_2_value * self.two_8) + ch2_3_value
             ch2_int = tc.twos_comp(ch2_int, 24)
@@ -1045,6 +1065,9 @@ class MainWindow(QMainWindow):
         elif self.lowPassSelect == lowPassFilterSelect.bpf1_50:
             filtering_ch1 = bf.butter_bandpass_filter(filtering_ch1, 1, 50, self.samplingRate, 7)
             filtering_ch2 = bf.butter_bandpass_filter(filtering_ch2, 1, 50, self.samplingRate, 7)
+        elif self.lowPassSelect == lowPassFilterSelect.high1:
+            filtering_ch1 = hf.butter_highpass_filter(filtering_ch1, 1, self.samplingRate)
+            filtering_ch2 = hf.butter_highpass_filter(filtering_ch2, 1, self.samplingRate)
         else:
             filtering_ch1 = lf.butter_lowpass_filter(filtering_ch1, 50, self.samplingRate)
             filtering_ch2 = lf.butter_lowpass_filter(filtering_ch2, 50, self.samplingRate)
@@ -1165,6 +1188,7 @@ class lowPassFilterSelect(enum.Enum):
     bpf1_20 = 1
     bpf1_50 = 2
     lpf50 = 3
+    high1 = 4
 
 
 class FFT_Channel_Select(enum.Enum):
