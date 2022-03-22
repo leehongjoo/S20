@@ -14,7 +14,8 @@ ver6 - 시험검사용으로 FFT 그래프 다 삭제
 ver6 filteredDataExtract - Save Data : raw data -> filtered data
 SEEG 용으로 inputDialog 추가
 ByteDataTxt - Byte Data String으로 txt
-hardwareValue 추가 -> mav_uv /1000 지우고
+hardwareValue 추가 -> mav_uv /1000 지우고 -> ADCUnitValue(hardwareValue) = 0.001029443 * 3.51 바꿀예정 아직 안바꿈
+바꿈
 save 여러번 가능 id는 그대로임
 """
 from PySide2.QtWidgets import (QMainWindow, QAction, QApplication, QSplashScreen, QDockWidget, QListWidget, QInputDialog,
@@ -30,6 +31,8 @@ import pyqtgraph.opengl as gl
 from scipy import fftpack
 from scipy.integrate import simps
 import stopdialog
+import LineDialog
+import BandPassSettingDialog
 import quamash
 import asyncio
 import numpy as np
@@ -75,6 +78,7 @@ class MainWindow(QMainWindow):
         self.two_8 = pow(2, 8)
         self.max_uv = 2.7
         self.hardwareValue = 0.001029443
+        self.weight = 3.51
         self.rawGraphFrame = 25
         self.update_num = 10
         self.windowed = np.hamming(self.fftMax)
@@ -112,6 +116,10 @@ class MainWindow(QMainWindow):
         self.notchSelect = notchFilterSelect.notch60
         self.lowPassSelect = lowPassFilterSelect.bpf1_50
         self.FFT_Select = FFT_Channel_Select.ch1
+        self.bandpassLowHz = 5
+        self.bandpassHighHz = 50
+        self.notchFilterHz = 60
+        self.notchFilterQualityFactor = 30
 
         fft_freq = fftpack.fftfreq(self.BL, 1 / self.samplingRate)
         pos_mask = np.where(fft_freq > 0)
@@ -425,17 +433,17 @@ class MainWindow(QMainWindow):
         self.notch60.setStatusTip("notch Filter 60 apply")
         self.notch60.setCheckable(True)
         self.notch60.triggered.connect(self.notch60Button)
-        self.notch50 = QAction("50Hz", self)
-        self.notch50.setStatusTip("notch Filter 50 apply")
-        self.notch50.setCheckable(True)
-        self.notch50.triggered.connect(self.notch50Button)
+        #self.notch50 = QAction("50Hz", self)
+        #self.notch50.setStatusTip("notch Filter 50 apply")
+        #self.notch50.setCheckable(True)
+        #self.notch50.triggered.connect(self.notch50Button)
         self.notchNone = QAction("&Off", self)
         self.notchNone.setStatusTip("notch Filter not apply")
         self.notchNone.setCheckable(True)
         self.notchNone.triggered.connect(self.notchNoneButton)
         self.notchActionGroup = QActionGroup(self)
         self.notchActionGroup.addAction(self.notch60)
-        self.notchActionGroup.addAction(self.notch50)
+        #self.notchActionGroup.addAction(self.notch50)
         self.notchActionGroup.addAction(self.notchNone)
         self.notch60.setChecked(True)
         self.notchActionGroup.triggered.connect(self.setNotch)
@@ -444,6 +452,7 @@ class MainWindow(QMainWindow):
         self.lowPassNone.setStatusTip("low pass Filter not apply")
         self.lowPassNone.setCheckable(True)
         self.lowPassNone.triggered.connect(self.lowPassNoneButton)
+        '''
         self.bandpass20 = QAction("S10 : 1-20 Hz", self)  # bandpass change
         self.bandpass20.setStatusTip("band pass Filter apply")
         self.bandpass20.setCheckable(True)
@@ -455,17 +464,23 @@ class MainWindow(QMainWindow):
         self.lowPass50.setStatusTip("band pass Filter apply")
         self.lowPass50.setCheckable(True)
         self.lowPass50.triggered.connect(self.lowPass50Button)
+        '''
+        self.bandpass5_50 = QAction("S20 : 5-50Hz", self)
+        self.bandpass5_50.setStatusTip("band pass 5-50Filter apply")
+        self.bandpass5_50.setCheckable(True)
+        self.bandpass5_50.triggered.connect(self.bandpass5_50Button)
         self.high1 = QAction("S20 : 1Hz", self)
         self.high1.setStatusTip("high pass Filter apply")
         self.high1.setCheckable(True)
         self.high1.triggered.connect(self.highpass1Button)
         self.lowPassActionGroup = QActionGroup(self)
         self.lowPassActionGroup.addAction(self.lowPassNone)
-        self.lowPassActionGroup.addAction(self.bandpass20)
-        self.lowPassActionGroup.addAction(self.bandpass50)
-        self.lowPassActionGroup.addAction(self.lowPass50)
-        self.lowPassActionGroup.addAction(self.high1)
-        self.bandpass50.setChecked(True)
+        #self.lowPassActionGroup.addAction(self.bandpass20)
+        #self.lowPassActionGroup.addAction(self.bandpass50)
+        #self.lowPassActionGroup.addAction(self.lowPass50)
+        #self.lowPassActionGroup.addAction(self.high1)
+        self.lowPassActionGroup.addAction(self.bandpass5_50)
+        self.bandpass5_50.setChecked(True)
         self.lowPassActionGroup.triggered.connect(self.setLowPass)
         '''
         # #fft channel change
@@ -485,6 +500,11 @@ class MainWindow(QMainWindow):
         self.aboutAction = QAction("&About", self)
         self.aboutAction.setStatusTip("Show the application's About box")
         self.aboutAction.triggered.connect(self.about)
+        #Filter Setting
+        self.notchFilterSettingAction = QAction("&notch Setting", self)
+        self.notchFilterSettingAction.triggered.connect(self.nfSetting)
+        self.bandpassFilterSettingAction = QAction("bandpaas Setting", self)
+        self.bandpassFilterSettingAction.triggered.connect(self.bfSetting)
 
         # development screen
         self.developmentScreen = QAction("&Development", self)
@@ -508,14 +528,15 @@ class MainWindow(QMainWindow):
         LEDMenu.addAction(self.BLELED)
         NotchMenu = self.menuBar().addMenu("&Notch")
         NotchMenu.addAction(self.notchNone)
-        NotchMenu.addAction(self.notch50)
+        #NotchMenu.addAction(self.notch50)
         NotchMenu.addAction(self.notch60)
         LowPassMenu = self.menuBar().addMenu("&Filter")
         LowPassMenu.addAction(self.lowPassNone)
-        LowPassMenu.addAction(self.bandpass20)
-        LowPassMenu.addAction(self.bandpass50)
-        LowPassMenu.addAction(self.lowPass50)
-        LowPassMenu.addAction(self.high1)
+        #LowPassMenu.addAction(self.bandpass20)
+        #LowPassMenu.addAction(self.bandpass50)
+        #LowPassMenu.addAction(self.lowPass50)
+        #LowPassMenu.addAction(self.high1)
+        LowPassMenu.addAction(self.bandpass5_50)
         '''
         FFTChangeMenu = self.menuBar().addMenu("&3D_FFT_Ch")
         FFTChangeMenu.addAction(self.FFT_Ch1)
@@ -523,6 +544,9 @@ class MainWindow(QMainWindow):
         '''
         helpMenu = self.menuBar().addMenu("&Help")
         helpMenu.addAction(self.aboutAction)
+        fSettingMenu = self.menuBar().addMenu("&FilterSetting")
+        fSettingMenu.addAction(self.notchFilterSettingAction)
+        fSettingMenu.addAction(self.bandpassFilterSettingAction)
 
         # createToolBar
         pgToolBar = self.addToolBar("PG")
@@ -708,7 +732,8 @@ class MainWindow(QMainWindow):
         if action == self.notch60:
             self.notch60Button()
         elif action == self.notch50:
-            self.notch50Button()
+            pass
+            #self.notch50Button()
         else:
             self.notchNoneButton()
 
@@ -747,6 +772,11 @@ class MainWindow(QMainWindow):
 
     def highpass1Button(self):
         self.lowPassSelect = lowPassFilterSelect.high1
+        self.ax1.setRange(xRange=[-5, 0], yRange=[-100, 100])
+        self.ax3.setRange(xRange=[-5, 0], yRange=[-100, 100])
+
+    def bandpass5_50Button(self):
+        self.lowPassSelect = lowPassFilterSelect.bpf5_50
         self.ax1.setRange(xRange=[-5, 0], yRange=[-100, 100])
         self.ax3.setRange(xRange=[-5, 0], yRange=[-100, 100])
 
@@ -829,6 +859,18 @@ class MainWindow(QMainWindow):
         sd = stopdialog.Ui_dialog(self)
         if sd.exec():
             self.plotInit()
+
+    def nfSetting(self):
+        sd = LineDialog.Ui_dialog(self)
+        sd.exec_()
+        self.notchFilterHz = int(sd.id)
+        self.notchFilterQualityFactor = int(sd.password)
+
+    def bfSetting(self):
+        dlg = BandPassSettingDialog.Ui_dialog(self)
+        dlg.exec_()
+        self.bandpassLowHz = int(dlg.id)
+        self.bandpassHighHz = int(dlg.password)
 
     def getOffset(self):
         value, ok = QInputDialog.getDouble(self, "Input value", "Offset:", 1.31, -10, 10, 2)
@@ -1019,12 +1061,12 @@ class MainWindow(QMainWindow):
             str_data = str(ch1_int)
             #self.f.write(str_data)
             #self.f.write('\n')
-            ch1_int = (ch1_int * self.hardwareValue + self.offsetPlus) * self.offset
+            ch1_int = (ch1_int * self.hardwareValue * self.weight) * self.offset
 
             self.ch1_int_buffer.append(ch1_int)
             ch2_int = (ch2_1_value * self.two_16) + (ch2_2_value * self.two_8) + ch2_3_value
             ch2_int = tc.twos_comp(ch2_int, 24)
-            ch2_int = (ch2_int * self.hardwareValue + self.offsetPlus) * self.offset
+            ch2_int = (ch2_int * self.hardwareValue * self.weight) * self.offset
             self.ch2_int_buffer.append(ch2_int)
 
     def print_graph(self):
@@ -1039,26 +1081,33 @@ class MainWindow(QMainWindow):
         self.fData2.extend(ch2)
         filtering_ch1 = list(self.fData)
         filtering_ch2 = list(self.fData2)
-        #filtering_ch1_alpha = list(self.fData)
-        #filtering_ch2_alpha = list(self.fData2)
+
+
         if self.notchSelect == notchFilterSelect.none:
             pass
         elif self.notchSelect == notchFilterSelect.notch60:
             self.notchCutOff = 60
-            notch_ch1 = nf.notch_filter(filtering_ch1, self.notchCutOff, self.samplingRate, self.notchQualityFactor)
-            notch_ch2 = nf.notch_filter(filtering_ch2, self.notchCutOff, self.samplingRate, self.notchQualityFactor)
-            filtering_ch1 = nf.notch_filter(notch_ch1, self.notchCutOff, self.samplingRate, self.notchQualityFactor)
-            filtering_ch2 = nf.notch_filter(notch_ch2, self.notchCutOff, self.samplingRate, self.notchQualityFactor)
+            notch_ch1 = nf.notch_filter(filtering_ch1, self.notchFilterHz, self.samplingRate, self.notchFilterQualityFactor)
+            notch_ch2 = nf.notch_filter(filtering_ch2, self.notchFilterHz, self.samplingRate, self.notchFilterQualityFactor)
+            #notch_ch1_2 = nf.notch_filter(notch_ch1, self.notchFilterHz, self.samplingRate, self.notchFilterQualityFactor)
+            #notch_ch2_2 = nf.notch_filter(notch_ch2, self.notchFilterHz, self.samplingRate, self.notchFilterQualityFactor)
+            filtering_ch1 = nf.notch_filter(notch_ch1, self.notchFilterHz, self.samplingRate, self.notchFilterQualityFactor)
+            filtering_ch2 = nf.notch_filter(notch_ch2, self.notchFilterHz, self.samplingRate, self.notchFilterQualityFactor)
         else:
             self.notchCutOff = 50
-            notch_ch1 = nf.notch_filter(filtering_ch1, self.notchCutOff, self.samplingRate, self.notchQualityFactor)
-            notch_ch2 = nf.notch_filter(filtering_ch2, self.notchCutOff, self.samplingRate, self.notchQualityFactor)
-            filtering_ch1 = nf.notch_filter(notch_ch1, self.notchCutOff, self.samplingRate, self.notchQualityFactor)
-            filtering_ch2 = nf.notch_filter(notch_ch2, self.notchCutOff, self.samplingRate, self.notchQualityFactor)
-        #filtering_ch1_alpha = filtering_ch1
-        #filtering_ch2_alpha = filtering_ch2
+            notch_ch1 = nf.notch_filter(filtering_ch1, self.notchCutOff, self.samplingRate, 25)
+            notch_ch2 = nf.notch_filter(filtering_ch2, self.notchCutOff, self.samplingRate, 25)
+            filtering_ch1 = nf.notch_filter(notch_ch1, self.notchCutOff, self.samplingRate, 25)
+            filtering_ch2 = nf.notch_filter(notch_ch2, self.notchCutOff, self.samplingRate, 25)
+
         if self.lowPassSelect == lowPassFilterSelect.none:
             pass
+        else:
+            filtering_ch1 = bf.butter_bandpass_filter(filtering_ch1, self.bandpassLowHz, self.bandpassHighHz, self.samplingRate, 7)
+            filtering_ch2 = bf.butter_bandpass_filter(filtering_ch2, self.bandpassLowHz, self.bandpassHighHz, self.samplingRate, 7)
+            #filtering_ch1 = lf.butter_lowpass_filter(filtering_ch1, 50, self.samplingRate)
+            #filtering_ch2 = lf.butter_lowpass_filter(filtering_ch2, 50, self.samplingRate)
+        '''
         elif self.lowPassSelect == lowPassFilterSelect.bpf1_20:
             filtering_ch1 = bf.butter_bandpass_filter(filtering_ch1, 1, 20, self.samplingRate, 7)
             filtering_ch2 = bf.butter_bandpass_filter(filtering_ch2, 1, 20, self.samplingRate, 7)
@@ -1068,10 +1117,10 @@ class MainWindow(QMainWindow):
         elif self.lowPassSelect == lowPassFilterSelect.high1:
             filtering_ch1 = hf.butter_highpass_filter(filtering_ch1, 1, self.samplingRate)
             filtering_ch2 = hf.butter_highpass_filter(filtering_ch2, 1, self.samplingRate)
-        else:
-            filtering_ch1 = lf.butter_lowpass_filter(filtering_ch1, 50, self.samplingRate)
-            filtering_ch2 = lf.butter_lowpass_filter(filtering_ch2, 50, self.samplingRate)
-
+        elif self.lowPassSelect == lowPassFilterSelect.bpf5_50:
+            filtering_ch1 = bf.butter_bandpass_filter(filtering_ch1, 5, 50, self.samplingRate, 7)
+            filtering_ch2 = bf.butter_bandpass_filter(filtering_ch2, 5, 50, self.samplingRate, 7)
+        '''
 
         #filtering_ch1_alpha = bf.butter_bandpass_filter(filtering_ch1, 8, 13, self.samplingRate, 5)
         #filtering_ch2_alpha = bf.butter_bandpass_filter(filtering_ch2, 8, 13, self.samplingRate, 5)
@@ -1189,6 +1238,7 @@ class lowPassFilterSelect(enum.Enum):
     bpf1_50 = 2
     lpf50 = 3
     high1 = 4
+    bpf5_50 = 5
 
 
 class FFT_Channel_Select(enum.Enum):
